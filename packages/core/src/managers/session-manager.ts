@@ -13,6 +13,7 @@ import type {
   CreateSessionRequest,
   UpdateSessionRequest,
 } from '@rodrigocoliveira/agno-types';
+import { parseToolArgs } from '../utils/parse-tool-arg';
 
 /**
  * Manages session operations
@@ -487,7 +488,7 @@ export class SessionManager {
             result: (toolObj.result as string) ?? undefined,
             tool_call_id: (toolObj.tool_call_id as string) ?? '',
             tool_name: (toolObj.tool_name as string) ?? '',
-            tool_args: (toolObj.tool_args as Record<string, string>) ?? {},
+            tool_args: parseToolArgs(toolObj.tool_args as Record<string, unknown>),
             tool_call_error: (toolObj.tool_call_error as boolean) ?? false,
             metrics: (toolObj.metrics as { time: number }) ?? { time: 0 },
             created_at: timestamp,
@@ -507,7 +508,7 @@ export class SessionManager {
               content: (reasoningMsg.content as string) ?? '',
               tool_call_id: (reasoningMsg.tool_call_id as string) ?? '',
               tool_name: (reasoningMsg.tool_name as string) ?? '',
-              tool_args: (reasoningMsg.tool_args as Record<string, string>) ?? {},
+              tool_args: parseToolArgs(reasoningMsg.tool_args as Record<string, unknown>),
               tool_call_error: (reasoningMsg.tool_call_error as boolean) ?? false,
               metrics: (reasoningMsg.metrics as { time: number }) ?? { time: 0 },
               created_at: (reasoningMsg.created_at as number) ?? timestamp,
