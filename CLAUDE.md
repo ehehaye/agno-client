@@ -680,6 +680,16 @@ When implementing or debugging frontend tool execution:
 6. **Error handling**: Wrap execution in try/catch and return error objects
 7. **Debugging**: Check browser console for `[useAgnoToolExecution]` logs
 
+### `tool_args` Python-repr workaround (agno#8007 / #11)
+
+The agno backend serializes list/dict values inside `tool_args` via Python `str()` / `repr()`, producing single-quoted literals that are NOT valid JSON. The core client coerces these at the parser boundary so handlers receive structured JS values.
+
+- **Type**: `ToolCall.tool_args` is `Record<string, unknown>` (was `Record<string, string>`).
+- **Coercion order**: structured values pass through → `JSON.parse` → internal Python-literal parser → fallback to original string.
+- **Helper**: `packages/core/src/utils/parse-tool-arg.ts` (`parseToolArg`, `parseToolArgs`).
+- **Applied at**: `event-processor.ts:processToolCall`, two RunPaused paths in `client.ts`, and two spots in `session-manager.ts` (history load).
+- **Reversal**: when [agno#8007](https://github.com/agno-agi/agno/issues/8007) ships, delete `parse-tool-arg.ts` and revert the call sites. Keep the `Record<string, unknown>` type — it's the long-term-correct shape.
+
 For complete implementation examples, see `docs/frontend-tools.md`.
 
 # Branch Naming Convention Prompt

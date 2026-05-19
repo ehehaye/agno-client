@@ -4,9 +4,11 @@ import type {
   RunResponseContent,
   ChatMessage,
   ToolCall,
+  ReasoningSteps,
 } from '@rodrigocoliveira/agno-types';
 import { RunEvent as RunEventEnum } from '@rodrigocoliveira/agno-types';
 import { getJsonMarkdown } from '../utils/json-markdown';
+import { parseToolArgs } from '../utils/parse-tool-arg';
 
 /**
  * Processes a new tool call and adds/updates it in the message
@@ -15,15 +17,21 @@ export function processToolCall(
   toolCall: ToolCall,
   prevToolCalls: ToolCall[] = []
 ): ToolCall[] {
+  // Coerce Python-repr tool_args at the parser boundary
+  // (workaround for agno#8007 / agno-client#11).
+  const normalized: ToolCall = toolCall.tool_args
+    ? { ...toolCall, tool_args: parseToolArgs(toolCall.tool_args) }
+    : toolCall;
+
   const toolCallId =
-    toolCall.tool_call_id || `${toolCall.tool_name}-${toolCall.created_at}`;
+    normalized.tool_call_id || `${normalized.tool_name}-${normalized.created_at}`;
 
   const existingToolCallIndex = prevToolCalls.findIndex(
     (tc) =>
-      (tc.tool_call_id && tc.tool_call_id === toolCall.tool_call_id) ||
+      (tc.tool_call_id && tc.tool_call_id === normalized.tool_call_id) ||
       (!tc.tool_call_id &&
-        toolCall.tool_name &&
-        toolCall.created_at &&
+        normalized.tool_name &&
+        normalized.created_at &&
         `${tc.tool_name}-${tc.created_at}` === toolCallId)
   );
 
@@ -31,11 +39,11 @@ export function processToolCall(
     const updatedToolCalls = [...prevToolCalls];
     updatedToolCalls[existingToolCallIndex] = {
       ...updatedToolCalls[existingToolCallIndex],
-      ...toolCall,
+      ...normalized,
     };
     return updatedToolCalls;
   } else {
-    return [...prevToolCalls, toolCall];
+    return [...prevToolCalls, normalized];
   }
 }
 
@@ -166,14 +174,24 @@ export class EventProcessor {
         break;
 
       case RunEventEnum.ReasoningStep:
-      case RunEventEnum.TeamReasoningStep:
+      case RunEventEnum.TeamReasoningStep: {
         const existingSteps = lastMessage.extra_data?.reasoning_steps ?? [];
-        const incomingSteps = chunk.extra_data?.reasoning_steps ?? [];
+
+        // Agno backend emits one ReasoningStep per event with the step in
+        // `chunk.content`. Keep `extra_data.reasoning_steps` as a fallback for
+        // backend variants that surface an accumulated list there.
+        const incomingSteps =
+          chunk.extra_data?.reasoning_steps ??
+          (chunk.content && typeof chunk.content === 'object'
+            ? [chunk.content as ReasoningSteps]
+            : []);
+
         updatedMessage.extra_data = {
           ...updatedMessage.extra_data,
           reasoning_steps: [...existingSteps, ...incomingSteps],
         };
         break;
+      }
 
       case RunEventEnum.ReasoningCompleted:
       case RunEventEnum.TeamReasoningCompleted:
