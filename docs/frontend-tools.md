@@ -257,6 +257,33 @@ Local handlers (in `useAgnoToolExecution`) override global handlers when both de
 
 5. **Timeout Handling**: Add timeouts for long-running operations
 
+## Tool Args Auto-Parsing
+
+The client auto-coerces `tool_args` values into structured JS at the parser boundary, so handlers receive native values regardless of how the backend serialized them:
+
+```ts
+// Backend serialized this as Python repr: "[{'month': 'Jan', 'revenue': 5000}]"
+const handlers = {
+  render_chart: async (args) => {
+    // args.data is already an array — no JSON.parse needed
+    return resultWithBarChart(args.data);
+  },
+};
+```
+
+This is a workaround for [agno#8007](https://github.com/agno-agi/agno/issues/8007), which causes list/dict values in `tool_args` to arrive as Python `repr()` strings (single-quoted, not valid JSON). Tracked downstream in [#11](https://github.com/rodrigocoliveira/agno-client/issues/11).
+
+The coercion is best-effort and forward-compatible:
+
+- **Structured values** (number, array, object) pass through unchanged.
+- **JSON strings** are parsed via `JSON.parse`.
+- **Python literals** (`"[{'a': 1}]"`, `"True"`, `"None"`) are parsed by an internal Python-literal parser.
+- **Plain strings** that aren't parseable as either remain unchanged.
+
+The type of `ToolCall.tool_args` is `Record<string, unknown>` — cast/narrow at the handler.
+
+> When agno fixes upstream, the coercion becomes a no-op transparently. The workaround lives in `packages/core/src/utils/parse-tool-arg.ts` and can be removed by reverting that file plus its four call sites (`event-processor.ts`, two spots in `client.ts`, and two in `session-manager.ts`).
+
 ---
 
 # Generative UI

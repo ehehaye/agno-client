@@ -87,6 +87,7 @@ import { SessionStateManager } from './managers/session-state-manager';
 import { EventProcessor } from './processors/event-processor';
 import { streamResponse } from './parsers/stream-parser';
 import { Logger } from './utils/logger';
+import { parseToolArgs } from './utils/parse-tool-arg';
 
 /**
  * Safely converts a Unix timestamp to ISO string with validation
@@ -576,7 +577,7 @@ export class AgnoClient extends EventEmitter {
       this.state.isStreaming = false;
       this.state.isPaused = true;
       this.state.pausedRunId = chunk.run_id;
-      this.state.toolsAwaitingExecution =
+      const pendingTools =
         chunk.tools_awaiting_external_execution ||
         chunk.tools_requiring_confirmation ||
         chunk.tools_requiring_user_input ||
@@ -585,6 +586,11 @@ export class AgnoClient extends EventEmitter {
             (t.external_execution_required === true || t.external_execution === true) &&
             (t.result === null || t.result === undefined)
         );
+      // Coerce Python-repr tool_args (workaround for agno#8007 / agno-client#11).
+      this.state.toolsAwaitingExecution = pendingTools.map((t: any) => ({
+        ...t,
+        tool_args: parseToolArgs(t.tool_args as Record<string, unknown>),
+      }));
 
       this.emit('run:paused', {
         runId: chunk.run_id,
@@ -1159,9 +1165,13 @@ export class AgnoClient extends EventEmitter {
         (run: any) => typeof run.status === 'string' && run.status.toLowerCase() === 'paused'
       );
       if (pausedRun) {
-        const pendingTools = ((pausedRun as any).tools ?? []).filter(
-          (t: any) => t.external_execution_required === true && t.result === null
-        );
+        const pendingTools = ((pausedRun as any).tools ?? [])
+          .filter((t: any) => t.external_execution_required === true && t.result === null)
+          // Coerce Python-repr tool_args (workaround for agno#8007 / agno-client#11).
+          .map((t: any) => ({
+            ...t,
+            tool_args: parseToolArgs(t.tool_args as Record<string, unknown>),
+          }));
         if (pendingTools.length > 0) {
           this.state.isPaused = true;
           this.state.pausedRunId = (pausedRun as any).run_id;

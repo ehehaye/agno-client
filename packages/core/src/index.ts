@@ -8,6 +8,7 @@ export { AgnoClient } from './client';
 
 // Utilities
 export { Logger } from './utils/logger';
+export { parseToolArg, parseToolArgs } from './utils/parse-tool-arg';
 
 // Traces manager types
 export type {
