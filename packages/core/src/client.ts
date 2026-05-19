@@ -580,8 +580,11 @@ export class AgnoClient extends EventEmitter {
         chunk.tools_awaiting_external_execution ||
         chunk.tools_requiring_confirmation ||
         chunk.tools_requiring_user_input ||
-        chunk.tools ||
-        [];
+        (chunk.tools || []).filter(
+          (t: any) =>
+            (t.external_execution_required === true || t.external_execution === true) &&
+            (t.result === null || t.result === undefined)
+        );
 
       this.emit('run:paused', {
         runId: chunk.run_id,
