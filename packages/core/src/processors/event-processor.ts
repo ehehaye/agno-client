@@ -4,6 +4,7 @@ import type {
   RunResponseContent,
   ChatMessage,
   ToolCall,
+  ReasoningSteps,
 } from '@rodrigocoliveira/agno-types';
 import { RunEvent as RunEventEnum } from '@rodrigocoliveira/agno-types';
 import { getJsonMarkdown } from '../utils/json-markdown';
@@ -166,14 +167,24 @@ export class EventProcessor {
         break;
 
       case RunEventEnum.ReasoningStep:
-      case RunEventEnum.TeamReasoningStep:
+      case RunEventEnum.TeamReasoningStep: {
         const existingSteps = lastMessage.extra_data?.reasoning_steps ?? [];
-        const incomingSteps = chunk.extra_data?.reasoning_steps ?? [];
+
+        // Agno backend emits one ReasoningStep per event with the step in
+        // `chunk.content`. Keep `extra_data.reasoning_steps` as a fallback for
+        // backend variants that surface an accumulated list there.
+        const incomingSteps =
+          chunk.extra_data?.reasoning_steps ??
+          (chunk.content && typeof chunk.content === 'object'
+            ? [chunk.content as ReasoningSteps]
+            : []);
+
         updatedMessage.extra_data = {
           ...updatedMessage.extra_data,
           reasoning_steps: [...existingSteps, ...incomingSteps],
         };
         break;
+      }
 
       case RunEventEnum.ReasoningCompleted:
       case RunEventEnum.TeamReasoningCompleted:
