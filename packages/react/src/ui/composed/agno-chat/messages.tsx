@@ -1,5 +1,5 @@
 import type { ChatMessage, ToolCall } from '@rodrigocoliveira/agno-types';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { isValidElement, useEffect, useRef, type ReactNode } from 'react';
 import {
   Conversation,
   ConversationContent,
@@ -15,7 +15,13 @@ import { useAgnoChatContext } from './context';
 import type { ToolResultRenderer } from './context';
 import { cn } from '../../lib/cn';
 import { Bot } from 'lucide-react';
-import type { AgnoMessageClassNames, AgnoMessageAvatars, AgnoMessageActions, SuggestedPrompt } from '../../types';
+import type {
+  AgnoMessageClassNames,
+  AgnoMessageAvatars,
+  AgnoMessageActions,
+  SuggestedPrompt,
+  ScrollBehaviorConfig,
+} from '../../types';
 
 export interface AgnoChatMessagesProps {
   className?: string;
@@ -66,6 +72,31 @@ export interface AgnoChatMessagesProps {
   showThinkingIndicator?: boolean;
   /** Custom component to render instead of the default thinking indicator */
   renderThinkingIndicator?: ReactNode;
+
+  // ── Scroll behavior ──────────────────────────────────────────────
+  /**
+   * Customize the auto-scroll behavior (powered by `use-stick-to-bottom`).
+   * Defaults to `{ initial: 'smooth', resize: 'instant' }` — smooth initial
+   * scroll, instant snap during streaming to avoid spring oscillation on
+   * markdown/code/table reflow.
+   */
+  scrollBehavior?: ScrollBehaviorConfig;
+
+  // ── Scroll-to-bottom button ──────────────────────────────────────
+  /**
+   * Controls the floating "scroll to bottom" button that appears when the
+   * user scrolls up during streaming (the default affordance to resume
+   * following the stream).
+   *
+   * - `undefined` (default) → render the built-in button
+   * - `false` → hide the button entirely
+   * - `true` → render the built-in button (same as default; useful for clarity)
+   * - `{ className }` → render the built-in button with custom classes
+   * - `ReactNode` → render your own element instead. Your component will be
+   *   placed inside `<Conversation>`, so it can use `useStickToBottomContext()`
+   *   to read `isAtBottom` and call `scrollToBottom()`.
+   */
+  scrollToBottomButton?: boolean | ReactNode | { className?: string };
 }
 
 /** Scrolls to bottom only when the user sends a new message */
@@ -114,11 +145,31 @@ export function AgnoChatMessages({
   showThinkingIndicator = true,
   renderThinkingIndicator,
   toolResultRenderers: propToolResultRenderers,
+  scrollBehavior,
+  scrollToBottomButton,
 }: AgnoChatMessagesProps) {
   const { messages, isStreaming, toolResultRenderers: contextToolResultRenderers } = useAgnoChatContext();
   const toolResultRenderers = propToolResultRenderers ?? contextToolResultRenderers;
   const lastMessage = messages[messages.length - 1];
   const isThinking = showThinkingIndicator && isStreaming && (!lastMessage || lastMessage.role !== 'user') && !lastMessage?.content;
+
+  // Resolve the scroll-to-bottom button prop into a rendered node (or null to hide).
+  const resolvedScrollButton: ReactNode = (() => {
+    if (scrollToBottomButton === false) return null;
+    if (scrollToBottomButton === undefined || scrollToBottomButton === true) {
+      return <ConversationScrollButton />;
+    }
+    if (isValidElement(scrollToBottomButton)) return scrollToBottomButton;
+    if (
+      typeof scrollToBottomButton === 'object' &&
+      scrollToBottomButton !== null &&
+      'className' in scrollToBottomButton
+    ) {
+      return <ConversationScrollButton className={scrollToBottomButton.className} />;
+    }
+    // Any other ReactNode shape (string, number, fragment, array)
+    return scrollToBottomButton as ReactNode;
+  })();
 
   // Find the index of the last assistant message (for visibility logic)
   let lastAssistantIndex = -1;
@@ -168,7 +219,7 @@ export function AgnoChatMessages({
     );
 
   return (
-    <Conversation className={cn('relative flex-1 w-full', className)}>
+    <Conversation className={cn('relative flex-1 w-full', className)} scrollBehavior={scrollBehavior}>
       <ScrollOnNewUserMessage messageCount={messages.length} />
       <ConversationContent className="max-w-3xl mx-auto">
         {messages.length === 0 ? (
@@ -198,7 +249,7 @@ export function AgnoChatMessages({
           </div>
         )}
       </ConversationContent>
-      <ConversationScrollButton />
+      {resolvedScrollButton}
     </Conversation>
   );
 }

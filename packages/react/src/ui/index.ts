@@ -21,6 +21,7 @@ export type {
   AgnoMessageAvatars,
   AgnoMessageActions,
   AgnoActionsVisibility,
+  ScrollBehaviorConfig,
 } from './types';
 
 // ── Primitives ──────────────────────────────────────────────────────────────
