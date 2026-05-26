@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { EXAMPLE_GENERATIVE_TOOLS } from '@/tools/exampleGenerativeTools'
 import { AskUserQuestionModal, AnswerBubble } from '@/tools/askUserQuestion'
+import { ShowAlertCard } from '@/tools/prettyToolRenderers'
 
 const SUGGESTED_PROMPTS = [
   { icon: <Zap className="h-3.5 w-3.5" />, text: "What can you help me with?" },
@@ -51,6 +52,9 @@ export function ChatComponentsPage() {
   }
 
   const renderTool: RenderTool = byToolName({
+    // Pattern A — REPLACE the default render.
+    // When ask_user_question completes, show only the AnswerBubble
+    // (no debug card stacked underneath it).
     ask_user_question: (tool) => {
       const answer = (tool.result ?? tool.content) as string | undefined
       if (!answer) return null
@@ -61,6 +65,18 @@ export function ChatComponentsPage() {
         />
       )
     },
+
+    // Pattern B — PRETTY + DEFAULT side by side.
+    // ShowAlertCard renders first; defaultRender() then emits whatever the lib
+    // would normally render (the ToolDebugCard when debug=true, generative UI
+    // when tool.ui_component is set, or nothing when both are absent). This is
+    // the "I want my own visual AND keep the debugger" combination.
+    show_alert: (tool, { defaultRender }) => (
+      <div className="space-y-2">
+        <ShowAlertCard tool={tool} />
+        {defaultRender()}
+      </div>
+    ),
   })
 
   return (
@@ -109,10 +125,10 @@ export function ChatComponentsPage() {
         {/* Chat Interface — compound component pattern */}
         <div className="flex-1 overflow-hidden">
           <AgnoChat
-            toolHandlers={toolHandlers}
-            renderTool={renderTool}
             skipHydration={['ask_user_question']}
             debug={false}
+            toolHandlers={toolHandlers}
+            renderTool={renderTool}
           >
             <AgnoChat.Messages
               avatars={{
@@ -127,7 +143,7 @@ export function ChatComponentsPage() {
                   </div>
                 ),
               }}
-              showReasoning={false}
+              showReasoning={true}
               messageClassNames={{ assistant: { container: 'pl-3' } }}
               actions={{
                 visibility: 'hover-last-visible',
