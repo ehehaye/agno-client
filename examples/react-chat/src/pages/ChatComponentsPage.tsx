@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { AgnoChat } from '@rodrigocoliveira/agno-react/ui'
-import type { ToolHandler, ToolResultRenderer } from '@rodrigocoliveira/agno-react'
+import { byToolName } from '@rodrigocoliveira/agno-react'
+import type { ToolHandler, RenderTool } from '@rodrigocoliveira/agno-react'
 import { SessionSidebar } from '@/components/sessions/SessionSidebar'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -49,11 +50,18 @@ export function ChatComponentsPage() {
     ...EXAMPLE_GENERATIVE_TOOLS,
   }
 
-  const toolResultRenderers: Record<string, ToolResultRenderer> = {
-    ask_user_question: (args, content) => (
-      <AnswerBubble question={(args.question ?? '') as string} answer={content} />
-    ),
-  }
+  const renderTool: RenderTool = byToolName({
+    ask_user_question: (tool) => {
+      const answer = (tool.result ?? tool.content) as string | undefined
+      if (!answer) return null
+      return (
+        <AnswerBubble
+          question={(tool.tool_args.question ?? '') as string}
+          answer={answer}
+        />
+      )
+    },
+  })
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -100,7 +108,12 @@ export function ChatComponentsPage() {
 
         {/* Chat Interface — compound component pattern */}
         <div className="flex-1 overflow-hidden">
-          <AgnoChat toolHandlers={toolHandlers} toolResultRenderers={toolResultRenderers}>
+          <AgnoChat
+            toolHandlers={toolHandlers}
+            renderTool={renderTool}
+            skipHydration={['ask_user_question']}
+            debug={false}
+          >
             <AgnoChat.Messages
               avatars={{
                 user: (
@@ -114,7 +127,6 @@ export function ChatComponentsPage() {
                   </div>
                 ),
               }}
-              showToolCalls={false}
               showReasoning={false}
               messageClassNames={{ assistant: { container: 'pl-3' } }}
               actions={{
