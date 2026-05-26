@@ -1,4 +1,4 @@
-import type { ChatMessage, ToolCall } from '@rodrigocoliveira/agno-types';
+import type { ChatMessage } from '@rodrigocoliveira/agno-types';
 import { isValidElement, useEffect, useRef, type ReactNode } from 'react';
 import {
   Conversation,
@@ -12,7 +12,7 @@ import { AgnoMessageItem } from '../AgnoMessageItem';
 import type { AgnoMessageItemProps } from '../AgnoMessageItem';
 import { AgnoChatSuggestedPrompts } from './suggested-prompts';
 import { useAgnoChatContext } from './context';
-import type { ToolResultRenderer } from './context';
+import type { RenderTool } from './render-tool';
 import { cn } from '../../lib/cn';
 import { Bot } from 'lucide-react';
 import type {
@@ -40,26 +40,20 @@ export interface AgnoChatMessagesProps {
   showReferences?: boolean;
   /** Show timestamp (default: true) */
   showTimestamp?: boolean;
-  /** Show generative UI renders (default: true) */
-  showGenerativeUI?: boolean;
-  /** Show tool call details (default: true) */
-  showToolCalls?: boolean;
   /** Enable file preview cards with click-to-open modal (default: true) */
   showFilePreview?: boolean;
   /** Enable image lightbox on click (default: true) */
   showImageLightbox?: boolean;
-  /** Custom render for individual tool calls */
-  renderToolCall?: (tool: ToolCall, index: number) => ReactNode;
-  /** Custom render for the entire message content area */
-  renderContent?: (message: ChatMessage) => ReactNode;
-  /** Custom render for media sections */
-  renderMedia?: (message: ChatMessage) => ReactNode;
   /** Custom timestamp formatter */
   formatTimestamp?: (date: Date) => string;
   /** ClassNames override map for message item sections */
   messageClassNames?: AgnoMessageClassNames;
-  /** Per-tool renderers for displaying results inline in chat (live and on session reload) */
-  toolResultRenderers?: Record<string, ToolResultRenderer>;
+  /**
+   * Per-tool render function. Overrides the `renderTool` configured on `<AgnoChat>`
+   * for this messages list. Use the `byToolName` helper for the common
+   * dispatch-by-name case.
+   */
+  renderTool?: RenderTool;
 
   // ── Empty state ──────────────────────────────────────────────────
   emptyState?: ReactNode;
@@ -128,13 +122,8 @@ export function AgnoChatMessages({
   showReasoning,
   showReferences,
   showTimestamp,
-  showGenerativeUI,
-  showToolCalls,
   showFilePreview,
   showImageLightbox,
-  renderToolCall,
-  renderContent,
-  renderMedia,
   formatTimestamp,
   messageClassNames,
   // Empty state
@@ -144,12 +133,11 @@ export function AgnoChatMessages({
   // Thinking indicator
   showThinkingIndicator = true,
   renderThinkingIndicator,
-  toolResultRenderers: propToolResultRenderers,
+  renderTool: propRenderTool,
   scrollBehavior,
   scrollToBottomButton,
 }: AgnoChatMessagesProps) {
-  const { messages, isStreaming, toolResultRenderers: contextToolResultRenderers } = useAgnoChatContext();
-  const toolResultRenderers = propToolResultRenderers ?? contextToolResultRenderers;
+  const { messages, isStreaming } = useAgnoChatContext();
   const lastMessage = messages[messages.length - 1];
   const isThinking = showThinkingIndicator && isStreaming && (!lastMessage || lastMessage.role !== 'user') && !lastMessage?.content;
 
@@ -185,16 +173,11 @@ export function AgnoChatMessages({
     ...(showReasoning !== undefined && { showReasoning }),
     ...(showReferences !== undefined && { showReferences }),
     ...(showTimestamp !== undefined && { showTimestamp }),
-    ...(showGenerativeUI !== undefined && { showGenerativeUI }),
-    ...(showToolCalls !== undefined && { showToolCalls }),
     ...(showFilePreview !== undefined && { showFilePreview }),
     ...(showImageLightbox !== undefined && { showImageLightbox }),
-    ...(renderToolCall !== undefined && { renderToolCall }),
-    ...(renderContent !== undefined && { renderContent }),
-    ...(renderMedia !== undefined && { renderMedia }),
     ...(formatTimestamp !== undefined && { formatTimestamp }),
     ...(messageClassNames !== undefined && { classNames: messageClassNames }),
-    ...(toolResultRenderers !== undefined && { toolResultRenderers }),
+    ...(propRenderTool !== undefined && { renderTool: propRenderTool }),
   };
 
   const resolvedEmptyState = children ??
