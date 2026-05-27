@@ -680,16 +680,16 @@ When implementing or debugging frontend tool execution:
 6. **Error handling**: Wrap execution in try/catch and return error objects
 7. **Debugging**: Check browser console for `[useAgnoToolExecution]` logs
 
-## Rendering Tool Calls (v2.0.1)
+## Rendering Tool Calls (v2.1)
 
 The React package exposes a single rendering pathway: a user-supplied `renderTool` callback. There is no implicit "generative UI" auto-rendering — what shows up in the chat for a tool call is exactly what `renderTool` returns.
 
-- **`<AgnoChat debug renderTool={...} skipHydration={...}>`** — top-level config.
+- **`<AgnoChat debug renderTool={...} skipToolsOnSessionLoad={...}>`** — top-level config.
 - **`renderTool(tool, { index, isDebug, defaultRender })`** — runs per tool call. Return `null` to hide, return `defaultRender()` to keep the library default, or return JSX for a custom render.
 - **`byToolName({ tool_name: false | RenderTool }, fallback?)`** — sugar for dispatch-by-name. Unlisted tools fall through to `defaultRender()` (or your fallback).
 - **`debug?: boolean`** — auto-detects via `process.env.NODE_ENV !== 'production'`. Controls whether `defaultRender()` emits a `<ToolDebugCard>`. In production with no custom `renderTool`, tool calls render nothing by default; set `debug={true}` in production to investigate live bugs.
 - **`<ToolDebugCard tool>`** — exported building block used by `defaultRender` in debug mode; also available for manual composition.
-- **`skipHydration?: string[]`** — tool names whose handlers should not be re-invoked on session reload (used when re-running would trigger side effects like modals or external calls).
+- **`skipToolsOnSessionLoad?: string[]`** — tool names whose handlers should not be re-invoked when a saved session is loaded. Use this for interactive tools whose handlers have side effects (open a modal, navigate, fire a mutation) — the stored `result` is still rendered from history. (Renamed from `skipHydration` in v2.1.)
 
 The old props (`renderToolCall`, `toolResultRenderers`, `showToolCalls`, `showGenerativeUI`, `ToolResultRenderer`) were removed in v2.0. See `docs/tool-rendering.md` for the migration table and four common patterns.
 
