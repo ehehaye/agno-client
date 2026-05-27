@@ -125,7 +125,7 @@ export function ChatComponentsPage() {
         {/* Chat Interface — compound component pattern */}
         <div className="flex-1 overflow-hidden">
           <AgnoChat
-            skipHydration={['ask_user_question']}
+            skipToolsOnSessionLoad={['ask_user_question']}
             debug={false}
             toolHandlers={toolHandlers}
             renderTool={renderTool}

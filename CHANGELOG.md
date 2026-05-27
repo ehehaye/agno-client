@@ -5,6 +5,21 @@ All notable changes to the Agno Client libraries will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-05-27
+
+### Breaking Changes
+
+#### @rodrigocoliveira/agno-react
+
+- **Renamed `skipHydration` → `skipToolsOnSessionLoad`** on `<AgnoChat>` and on the options object of `useAgnoToolExecution`. Behavior is unchanged — it still lists tool names whose handlers should not be re-invoked when a saved session is loaded (to avoid replaying side effects like modals, navigation, mutations). The new name makes the trigger (session load) and the value shape (a list of tool names) self-evident.
+
+  **Migration:**
+
+  | v2.0 | v2.1 |
+  | --- | --- |
+  | `<AgnoChat skipHydration={['name1']}>` | `<AgnoChat skipToolsOnSessionLoad={['name1']}>` |
+  | `useAgnoToolExecution(handlers, true, { skipHydration: [...] })` | `useAgnoToolExecution(handlers, true, { skipToolsOnSessionLoad: [...] })` |
+
 ## [2.0.0] - 2026-05-26
 
 ### Breaking Changes

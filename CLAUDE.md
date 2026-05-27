@@ -684,12 +684,12 @@ When implementing or debugging frontend tool execution:
 
 The React package exposes a single, unified API for rendering tool calls in the chat UI:
 
-- **`<AgnoChat debug renderTool={...} skipHydration={...}>`** — top-level config.
+- **`<AgnoChat debug renderTool={...} skipToolsOnSessionLoad={...}>`** — top-level config.
 - **`renderTool(tool, { index, isDebug, defaultRender })`** — runs per tool call. Return `null` to hide, return `defaultRender()` to fall back to library defaults, or return JSX for a custom render.
 - **`byToolName({ tool_name: false | RenderTool }, fallback?)`** — sugar for dispatch-by-name. Unlisted tools fall through to `defaultRender()` (or your fallback).
 - **`debug?: boolean`** — auto-detects via `process.env.NODE_ENV !== 'production'`. Controls whether `defaultRender()` includes the `<ToolDebugCard>`. Generative UI from `tool.ui_component` always renders by default. Set `debug={true}` in production to investigate live bugs.
 - **`<ToolDebugCard tool>`** and **`<ToolGenerativeUI tool>`** — exported building blocks used internally by `defaultRender` and available for manual composition.
-- **`skipHydration?: string[]`** — tool names whose handlers should not be re-invoked on session reload (used when the rendered output is derived from `tool.result` and re-running would trigger side effects).
+- **`skipToolsOnSessionLoad?: string[]`** — tool names whose handlers should not be re-invoked when a saved session is loaded. Use this for interactive tools whose handlers have side effects (open a modal, navigate, fire a mutation) — the stored `result` is still rendered from history. (Renamed from `skipHydration` in v2.1.)
 
 The old props (`renderToolCall`, `toolResultRenderers`, `showToolCalls`, `showGenerativeUI`, `ToolResultRenderer`) were removed in v2.0. See `docs/tool-rendering.md` for the migration table and four common patterns.
 

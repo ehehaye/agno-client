@@ -133,14 +133,14 @@ renderTool={(tool) => (
 />
 ```
 
-## HITL sessions: `skipHydration`
+## HITL sessions: `skipToolsOnSessionLoad`
 
-If a tool was a Human-in-the-Loop interaction and its result is already on the message (from a previous run), you don't want its handler to re-execute when the session loads. Pass the tool names to `skipHydration`:
+If a tool was a Human-in-the-Loop interaction and its result is already on the message (from a previous run), you don't want its handler to re-execute when the session loads — re-invoking it would replay side effects (open a modal, navigate, fire a mutation). Pass the tool names to `skipToolsOnSessionLoad` and the library will render the stored result from history instead:
 
 ```tsx
 <AgnoChat
   toolHandlers={{ ask_user_question: askHandler }}
-  skipHydration={['ask_user_question']}
+  skipToolsOnSessionLoad={['ask_user_question']}
   renderTool={byToolName({
     ask_user_question: (tool) => (
       <AnswerBubble answer={tool.result as string} />
