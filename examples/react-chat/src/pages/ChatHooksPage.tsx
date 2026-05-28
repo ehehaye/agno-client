@@ -2,12 +2,15 @@ import { useState } from 'react'
 import { ChatInterface } from '@/components/chat/ChatInterface'
 import { SessionSidebar } from '@/components/sessions/SessionSidebar'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function ChatHooksPage() {
   const [showSessionSidebar, setShowSessionSidebar] = useState(true)
+  const [backgroundMode, setBackgroundMode] = useState<boolean>(false)
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -45,11 +48,23 @@ export function ChatHooksPage() {
           <span className="text-xs text-muted-foreground ml-2">
             {showSessionSidebar ? 'Sessions' : 'Show sessions sidebar'}
           </span>
+
+          {/* Background mode toggle */}
+          <div className="flex items-center gap-2 ml-auto pr-1">
+            <Switch
+              id="background-mode"
+              checked={backgroundMode}
+              onCheckedChange={setBackgroundMode}
+            />
+            <Label htmlFor="background-mode" className="text-xs text-muted-foreground cursor-pointer select-none">
+              Background mode
+            </Label>
+          </div>
         </div>
 
         {/* Chat Interface */}
         <div className="flex-1 overflow-hidden">
-          <ChatInterface />
+          <ChatInterface backgroundMode={backgroundMode} />
         </div>
       </div>
     </div>
