@@ -837,12 +837,15 @@ export class AgnoClient extends EventEmitter {
     onChunk: (chunk: RunResponse) => void;
     onError: (error: Error) => void;
     onComplete: () => Promise<void>;
+    streamingFn?: typeof streamResponse;
   }): Promise<void> {
+    const streamingFn = config.streamingFn ?? streamResponse;
+
     const executeStream = async () => {
       const headers = this.configManager.buildRequestHeaders(config.perRequestHeaders);
       const params = this.configManager.buildQueryString(config.perRequestParams);
 
-      await streamResponse({
+      await streamingFn({
         apiUrl: config.apiUrl,
         headers,
         params,
