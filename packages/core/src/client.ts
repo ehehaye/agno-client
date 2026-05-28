@@ -546,8 +546,10 @@ export class AgnoClient extends EventEmitter {
   private handleChunk(chunk: RunResponse, currentSessionId: string | undefined, messageContent: string): void {
     // Drop stale chunks from a previously-aborted stream or a misrouted backend chunk.
     // The active session in configManager is the source of truth — mismatched chunks
-    // must not write into the wrong messageStore.
-    if (chunk.session_id && chunk.session_id !== this.configManager.getSessionId()) {
+    // must not write into the wrong messageStore. Only fires when we have an active
+    // session to compare against; the first chunk of a new session sets the ID itself.
+    const activeSessionId = this.configManager.getSessionId();
+    if (activeSessionId && chunk.session_id && chunk.session_id !== activeSessionId) {
       return;
     }
 
