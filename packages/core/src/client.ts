@@ -86,6 +86,7 @@ import { ComponentManager } from './managers/component-manager';
 import { SessionStateManager } from './managers/session-state-manager';
 import { EventProcessor } from './processors/event-processor';
 import { streamResponse } from './parsers/stream-parser';
+import { streamResponseSSE } from './parsers/sse-parser';
 import { Logger } from './utils/logger';
 import { parseToolArgs } from './utils/parse-tool-arg';
 
@@ -304,11 +305,18 @@ export class AgnoClient extends EventEmitter {
    */
   async sendMessage(
     message: string | FormData,
-    options?: { headers?: Record<string, string>; params?: Record<string, string> }
+    options?: {
+      headers?: Record<string, string>;
+      params?: Record<string, string>;
+      background?: boolean;
+    }
   ): Promise<void> {
     if (this.state.isStreaming) {
       throw new Error('Already streaming a message');
     }
+
+    // Resolve background flag: per-call override > config default > false.
+    const background = options?.background ?? this.configManager.getBackground();
 
     // Reset completion flag for new message
     this.runCompletedSuccessfully = false;
@@ -397,6 +405,9 @@ export class AgnoClient extends EventEmitter {
     let newSessionId = this.configManager.getSessionId();
 
     formData.append('stream', 'true');
+    if (background) {
+      formData.append('background', 'true');
+    }
     formData.append('session_id', newSessionId ?? '');
 
     // Add user_id if configured
@@ -417,6 +428,7 @@ export class AgnoClient extends EventEmitter {
       signal: this.abortController.signal,
       perRequestHeaders: options?.headers,
       perRequestParams: options?.params,
+      streamingFn: background ? streamResponseSSE : streamResponse,
       onChunk: (chunk: RunResponse) => {
         this.handleChunk(chunk, newSessionId, formData.get('message') as string);
 
