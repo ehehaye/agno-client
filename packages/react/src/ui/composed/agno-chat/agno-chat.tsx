@@ -43,6 +43,23 @@ export interface AgnoChatRootProps extends HTMLAttributes<HTMLDivElement> {
    * effects. The tool's stored `result` is still rendered from history.
    */
   skipToolsOnSessionLoad?: string[];
+  /**
+   * Override the provider's background mode for this chat instance.
+   *
+   * - `true`: this chat sends in background mode (the run survives client
+   *   disconnect and auto-resumes on next `loadSession`).
+   * - `false`: this chat sends in foreground regardless of provider config.
+   * - `undefined` (default): inherits from `AgnoProvider`'s `config.background`.
+   *
+   * Resolution precedence (highest first):
+   *   per-call `sendMessage(msg, { background })` →
+   *   `<AgnoChat background={X}>` →
+   *   `AgnoProvider` `config.background` →
+   *   `false`.
+   *
+   * See `docs/background-execution.md` for what background mode does.
+   */
+  background?: boolean;
 }
 
 export function AgnoChatRoot({
@@ -52,6 +69,7 @@ export function AgnoChatRoot({
   renderTool,
   debug,
   skipToolsOnSessionLoad,
+  background,
   className,
   ...divProps
 }: AgnoChatRootProps) {
@@ -66,9 +84,20 @@ export function AgnoChatRoot({
   const sendRef = useRef(chat.sendMessage);
   sendRef.current = chat.sendMessage;
 
+  // Ref the `background` prop so `handleSend` stays referentially stable
+  // across renders (matches the `sendRef` pattern above).
+  const backgroundRef = useRef(background);
+  backgroundRef.current = background;
+
   const handleSend = useCallback(async (message: string | FormData) => {
     try {
-      await sendRef.current(message);
+      const bg = backgroundRef.current;
+      // Pass `{ background }` only when the prop is explicitly set; otherwise
+      // let `sendMessage`'s resolution fall through to the provider config.
+      await sendRef.current(
+        message,
+        bg !== undefined ? { background: bg } : undefined,
+      );
     } catch {
       // Error is surfaced via the error state
     }
