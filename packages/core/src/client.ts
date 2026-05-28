@@ -1156,6 +1156,7 @@ export class AgnoClient extends EventEmitter {
       this.abortController.abort();
       this.abortController = undefined;
       this.state.isStreaming = false;
+      this.currentRunId = undefined;
       this.state.currentRunId = undefined;
       // Do not emit stream:end — the stream was interrupted, not completed.
     }
