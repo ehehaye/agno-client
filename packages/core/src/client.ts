@@ -1838,12 +1838,21 @@ export class AgnoClient extends EventEmitter {
       throw new Error('No agent or team selected');
     }
 
-    // Ensure an agent placeholder exists for this run. Auto-resume invocations
-    // hit the "reuse" branch (loadSession added an empty placeholder from history);
-    // manual invocations may hit the "append" branch.
+    // Ensure an agent placeholder exists for this run, and that it's empty.
+    // Auto-resume invocations hit the "reuse" branch (loadSession added a
+    // placeholder from history) — clear its content/tool_calls to avoid
+    // duplication if the row had partial content. Manual invocations may
+    // hit the "append" branch.
     const messages = this.messageStore.getMessages();
     const lastMessage = messages[messages.length - 1];
-    if (!(lastMessage?.role === 'agent' && lastMessage.run_id === runId)) {
+    if (lastMessage?.role === 'agent' && lastMessage.run_id === runId) {
+      const lastIndex = messages.length - 1;
+      this.messageStore.updateMessage(lastIndex, (m) => ({
+        ...m,
+        content: '',
+        tool_calls: [],
+      }));
+    } else {
       this.messageStore.addMessage({
         role: 'agent',
         content: '',
