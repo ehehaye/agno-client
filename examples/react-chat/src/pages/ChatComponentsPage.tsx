@@ -195,7 +195,7 @@ export function ChatComponentsPage() {
               showReasoning={true}
               messageClassNames={{ assistant: { container: 'pl-3' } }}
               actions={{
-                visibility: 'hover-last-visible',
+                visibility: 'hover',
                 assistant: (message) => (
                   <>
                     <button
