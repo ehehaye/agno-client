@@ -1149,6 +1149,17 @@ export class AgnoClient extends EventEmitter {
     sessionId: string,
     options?: { params?: Record<string, string> }
   ): Promise<ChatMessage[]> {
+    // Abort any in-flight stream. Server-side a `background=true` run continues
+    // independently and is picked up by the RUNNING detection at the bottom of
+    // this method. For foreground runs, this matches today's behavior on tab close.
+    if (this.state.isStreaming && this.abortController) {
+      this.abortController.abort();
+      this.abortController = undefined;
+      this.state.isStreaming = false;
+      this.state.currentRunId = undefined;
+      // Do not emit stream:end — the stream was interrupted, not completed.
+    }
+
     Logger.debug('[AgnoClient] loadSession called with sessionId:', sessionId);
     const config = this.configManager.getConfig();
     const entityType = this.configManager.getMode();
