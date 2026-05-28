@@ -600,6 +600,30 @@ function ComponentManager() {
 - `packages/core/src/client.ts` - Component methods on AgnoClient
 - `packages/react/src/hooks/useAgnoComponents.ts` - React hook
 
+## Background Execution + Resume
+
+The client supports backgrounded runs that survive client disconnects. When
+`sendMessage(msg, { background: true })` (or `config.background = true`) is used,
+the lib appends `background=true` to the run FormData and routes the stream
+through a new SSE parser (`packages/core/src/parsers/sse-parser.ts`).
+
+On the next `loadSession(sessionId)`, the lib scans the runs response for any
+run with `status === "RUNNING"` and fires `client.resumeRun({ runId, sessionId })`
+fire-and-forget. The `/resume` endpoint replays buffered events as SSE
+(`catch_up` / `replay` / `subscribed` meta events first, then real run events).
+The standard `handleChunk` pipeline absorbs them into the existing agent message.
+
+**Key files:**
+- `packages/core/src/parsers/sse-parser.ts` — `streamResponseSSE`, `parseSSEBuffer`
+- `packages/core/src/client.ts` — `sendMessage` opt-in branch; `resumeRun`;
+  abort-on-switch in `loadSession`; defensive `session_id` filter in `handleChunk`
+- `packages/core/src/managers/config-manager.ts` — `getBackground`, `setBackground`, `getResumeUrl`
+
+**Consumer guide:** [docs/background-execution.md](docs/background-execution.md).
+
+The foreground NDJSON parser (`stream-parser.ts`) is unchanged — both parsers
+are wired through `executeStream`, which now takes an optional `streamingFn`.
+
 ## Type Safety and Official Types
 
 All types in `@rodrigocoliveira/agno-types` are based on the **official Agno API specification** provided by the Agno team. When making changes:
