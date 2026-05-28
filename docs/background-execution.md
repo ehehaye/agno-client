@@ -64,8 +64,13 @@ If you ever need to resume by hand (e.g., a custom retry flow):
 await client.resumeRun({ runId, sessionId });
 ```
 
-This is the same call auto-resume uses. If a stream is already in flight for
-the same `runId`, the call is a no-op.
+This is the same call auto-resume uses. The behavior depends on what's
+currently streaming:
+
+- If a stream is already in flight for the **same** `runId`, the call is a no-op.
+- If a **different** run is currently streaming, `resumeRun` throws an
+  `Error('Already streaming a different run')`. Catch this if you call
+  `resumeRun` outside of the auto-resume path.
 
 ## Teams
 
