@@ -1247,6 +1247,22 @@ export class AgnoClient extends EventEmitter {
       });
     }
 
+    // Auto-resume detection: any run with status "RUNNING" indicates a
+    // detached background run that the user reloaded into. Fire-and-forget
+    // resumeRun — errors surface via run:resume:error event.
+    // Both agents and teams support /resume.
+    const runningRun = response.find(
+      (run: any) => typeof run.status === 'string' && run.status.toLowerCase() === 'running'
+    );
+    if (runningRun) {
+      void this.resumeRun({
+        runId: (runningRun as any).run_id,
+        sessionId,
+      }).catch((err) => {
+        Logger.warn('[AgnoClient] Auto-resume failed:', err);
+      });
+    }
+
     Logger.debug('[AgnoClient] Events emitted, returning messages');
 
     return messages;
