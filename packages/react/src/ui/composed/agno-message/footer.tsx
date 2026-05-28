@@ -16,11 +16,16 @@ export function AgnoMessageFooter({ showTimestamp = true }: AgnoMessageFooterPro
   const isCustomTimestamp = !!formatTimestamp;
   const resolvedFormatTimestamp = formatTimestamp ?? formatSmartTimestamp;
 
+  // Group actions + timestamp + error as a single unit: hide the whole footer
+  // while the agent is still streaming this message. Offering actions or
+  // showing a "final" timestamp on incomplete content is misleading UX.
+  if (isStreamingThisMessage) return null;
+
   if (!actions?.assistant && !showTimestamp && !hasError) return null;
 
   return (
     <div className="flex items-center gap-2 pt-1">
-      {actions?.assistant && !isStreamingThisMessage && (() => {
+      {actions?.assistant && (() => {
         const visibility = actions.visibility ?? 'visible';
         if (visibility === 'last-assistant' && !isLastAssistantMessage) return null;
 
