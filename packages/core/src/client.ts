@@ -1854,8 +1854,11 @@ export class AgnoClient extends EventEmitter {
     this.emit('message:update', this.messageStore.getMessages());
 
     const formData = new FormData();
-    // Empty last_event_index = full replay (server condition: `if last_event_index is None`).
-    formData.append('last_event_index', lastEventIndex === undefined ? '' : String(lastEventIndex));
+    // Omit last_event_index when undefined so the server defaults to None (full replay).
+    // Sending empty string risks FastAPI `int('')` validation errors depending on the endpoint signature.
+    if (lastEventIndex !== undefined) {
+      formData.append('last_event_index', String(lastEventIndex));
+    }
     formData.append('session_id', sessionId);
 
     const userId = this.configManager.getUserId();
