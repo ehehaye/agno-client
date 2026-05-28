@@ -32,6 +32,13 @@ export interface AgnoMessageProps {
   avatars?: AgnoMessageAvatars;
   actions?: AgnoMessageActions;
   isLastAssistantMessage?: boolean;
+  /**
+   * True when this message is the one currently being streamed by the agent.
+   * Set by `<AgnoChat.Messages>` based on `isStreaming` from the chat context.
+   * The footer hides action buttons (copy/like/etc.) while this is true to
+   * avoid offering actions on incomplete content. Default: false.
+   */
+  isStreamingThisMessage?: boolean;
   showFilePreview?: boolean;
   showImageLightbox?: boolean;
   showTimestamp?: boolean;
@@ -72,6 +79,7 @@ export function AgnoMessage({
   avatars,
   actions,
   isLastAssistantMessage = false,
+  isStreamingThisMessage = false,
   showFilePreview = true,
   showImageLightbox = true,
   showTimestamp = true,
@@ -90,6 +98,7 @@ export function AgnoMessage({
     () => ({
       message,
       isLastAssistantMessage,
+      isStreamingThisMessage,
       classNames,
       actions,
       avatars,
@@ -109,6 +118,7 @@ export function AgnoMessage({
     [
       message,
       isLastAssistantMessage,
+      isStreamingThisMessage,
       classNames,
       actions,
       avatars,

@@ -220,6 +220,7 @@ export function AgnoChatMessages({
                 avatars={avatars}
                 actions={actions}
                 isLastAssistantMessage={index === lastAssistantIndex}
+                isStreamingThisMessage={index === lastAssistantIndex && isStreaming}
                 {...messageItemProps}
               />
             );

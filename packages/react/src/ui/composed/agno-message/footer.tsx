@@ -10,7 +10,7 @@ export interface AgnoMessageFooterProps {
 }
 
 export function AgnoMessageFooter({ showTimestamp = true }: AgnoMessageFooterProps = {}) {
-  const { message, classNames, actions, isLastAssistantMessage, formatTimestamp } =
+  const { message, classNames, actions, isLastAssistantMessage, isStreamingThisMessage, formatTimestamp } =
     useAgnoMessageContext();
   const hasError = message.streamingError;
   const isCustomTimestamp = !!formatTimestamp;
@@ -20,7 +20,7 @@ export function AgnoMessageFooter({ showTimestamp = true }: AgnoMessageFooterPro
 
   return (
     <div className="flex items-center gap-2 pt-1">
-      {actions?.assistant && (() => {
+      {actions?.assistant && !isStreamingThisMessage && (() => {
         const visibility = actions.visibility ?? 'visible';
         if (visibility === 'last-assistant' && !isLastAssistantMessage) return null;
 

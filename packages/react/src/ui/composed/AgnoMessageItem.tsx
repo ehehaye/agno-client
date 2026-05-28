@@ -10,6 +10,8 @@ export interface AgnoMessageItemProps {
   avatars?: AgnoMessageAvatars;
   actions?: AgnoMessageActions;
   isLastAssistantMessage?: boolean;
+  /** True when this message is the one currently being streamed. Forwarded to the footer to hide action buttons on incomplete content. */
+  isStreamingThisMessage?: boolean;
   /** Show reasoning steps (default: true). Omit `<AgnoMessage.Reasoning />` in custom compositions for finer control. */
   showReasoning?: boolean;
   /** Show references (default: true). Omit `<AgnoMessage.References />` in custom compositions for finer control. */
@@ -35,6 +37,7 @@ export function AgnoMessageItem({
   avatars,
   actions,
   isLastAssistantMessage = false,
+  isStreamingThisMessage = false,
   showReasoning = true,
   showReferences = true,
   showTimestamp = true,
@@ -51,6 +54,7 @@ export function AgnoMessageItem({
       avatars={avatars}
       actions={actions}
       isLastAssistantMessage={isLastAssistantMessage}
+      isStreamingThisMessage={isStreamingThisMessage}
       showTimestamp={showTimestamp}
       showFilePreview={showFilePreview}
       showImageLightbox={showImageLightbox}
