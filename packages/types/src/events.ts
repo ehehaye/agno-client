@@ -62,4 +62,9 @@ export type ClientEvent =
   | 'member:started'  // Emitted when a team member starts processing
   | 'member:content'  // Emitted when a team member produces content
   | 'member:completed' // Emitted when a team member completes
-  | 'member:error';   // Emitted when a team member encounters an error
+  | 'member:error'    // Emitted when a team member encounters an error
+  // Background execution / resume lifecycle
+  | 'run:resume:start'   // resumeRun call started
+  | 'run:resume:meta'    // catch_up / replay / subscribed meta event from /resume
+  | 'run:resume:end'     // resume stream completed normally
+  | 'run:resume:error';  // /resume failed (run not found, buffer expired, network)

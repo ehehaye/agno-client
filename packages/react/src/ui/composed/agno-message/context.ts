@@ -12,6 +12,13 @@ import type { RenderTool } from '../agno-chat/render-tool';
 export interface AgnoMessageContextValue {
   message: ChatMessage;
   isLastAssistantMessage: boolean;
+  /**
+   * True when this message is the one currently being streamed by the agent.
+   * The footer uses this to hide action buttons (copy/like/etc.) on incomplete
+   * content. Set by `<AgnoChat.Messages>` (chat-context aware); defaults to
+   * false when `<AgnoMessage>` is used standalone outside `<AgnoChat>`.
+   */
+  isStreamingThisMessage: boolean;
   classNames?: AgnoMessageClassNames;
   actions?: AgnoMessageActions;
   avatars?: AgnoMessageAvatars;

@@ -86,6 +86,7 @@ import { ComponentManager } from './managers/component-manager';
 import { SessionStateManager } from './managers/session-state-manager';
 import { EventProcessor } from './processors/event-processor';
 import { streamResponse } from './parsers/stream-parser';
+import { streamResponseSSE } from './parsers/sse-parser';
 import { Logger } from './utils/logger';
 import { parseToolArgs } from './utils/parse-tool-arg';
 
@@ -304,11 +305,18 @@ export class AgnoClient extends EventEmitter {
    */
   async sendMessage(
     message: string | FormData,
-    options?: { headers?: Record<string, string>; params?: Record<string, string> }
+    options?: {
+      headers?: Record<string, string>;
+      params?: Record<string, string>;
+      background?: boolean;
+    }
   ): Promise<void> {
     if (this.state.isStreaming) {
       throw new Error('Already streaming a message');
     }
+
+    // Resolve background flag: per-call override > config default > false.
+    const background = options?.background ?? this.configManager.getBackground();
 
     // Reset completion flag for new message
     this.runCompletedSuccessfully = false;
@@ -397,6 +405,9 @@ export class AgnoClient extends EventEmitter {
     let newSessionId = this.configManager.getSessionId();
 
     formData.append('stream', 'true');
+    if (background) {
+      formData.append('background', 'true');
+    }
     formData.append('session_id', newSessionId ?? '');
 
     // Add user_id if configured
@@ -417,6 +428,7 @@ export class AgnoClient extends EventEmitter {
       signal: this.abortController.signal,
       perRequestHeaders: options?.headers,
       perRequestParams: options?.params,
+      streamingFn: background ? streamResponseSSE : streamResponse,
       onChunk: (chunk: RunResponse) => {
         this.handleChunk(chunk, newSessionId, formData.get('message') as string);
 
@@ -532,6 +544,15 @@ export class AgnoClient extends EventEmitter {
    * Handle streaming chunk
    */
   private handleChunk(chunk: RunResponse, currentSessionId: string | undefined, messageContent: string): void {
+    // Drop stale chunks from a previously-aborted stream or a misrouted backend chunk.
+    // The active session in configManager is the source of truth — mismatched chunks
+    // must not write into the wrong messageStore. Only fires when we have an active
+    // session to compare against; the first chunk of a new session sets the ID itself.
+    const activeSessionId = this.configManager.getSessionId();
+    if (activeSessionId && chunk.session_id && chunk.session_id !== activeSessionId) {
+      return;
+    }
+
     const event = chunk.event as RunEvent;
 
     // Handle session creation and run ID tracking (always process these regardless of mode)
@@ -837,12 +858,15 @@ export class AgnoClient extends EventEmitter {
     onChunk: (chunk: RunResponse) => void;
     onError: (error: Error) => void;
     onComplete: () => Promise<void>;
+    streamingFn?: typeof streamResponse;
   }): Promise<void> {
+    const streamingFn = config.streamingFn ?? streamResponse;
+
     const executeStream = async () => {
       const headers = this.configManager.buildRequestHeaders(config.perRequestHeaders);
       const params = this.configManager.buildQueryString(config.perRequestParams);
 
-      await streamResponse({
+      await streamingFn({
         apiUrl: config.apiUrl,
         headers,
         params,
@@ -1125,6 +1149,18 @@ export class AgnoClient extends EventEmitter {
     sessionId: string,
     options?: { params?: Record<string, string> }
   ): Promise<ChatMessage[]> {
+    // Abort any in-flight stream. Server-side a `background=true` run continues
+    // independently and is picked up by the RUNNING detection at the bottom of
+    // this method. For foreground runs, this matches today's behavior on tab close.
+    if (this.state.isStreaming && this.abortController) {
+      this.abortController.abort();
+      this.abortController = undefined;
+      this.state.isStreaming = false;
+      this.currentRunId = undefined;
+      this.state.currentRunId = undefined;
+      // Do not emit stream:end — the stream was interrupted, not completed.
+    }
+
     Logger.debug('[AgnoClient] loadSession called with sessionId:', sessionId);
     const config = this.configManager.getConfig();
     const entityType = this.configManager.getMode();
@@ -1208,6 +1244,22 @@ export class AgnoClient extends EventEmitter {
         runId: this.state.pausedRunId,
         sessionId,
         tools: this.state.toolsAwaitingExecution ?? [],
+      });
+    }
+
+    // Auto-resume detection: any run with status "RUNNING" indicates a
+    // detached background run that the user reloaded into. Fire-and-forget
+    // resumeRun — errors surface via run:resume:error event.
+    // Both agents and teams support /resume.
+    const runningRun = response.find(
+      (run: any) => typeof run.status === 'string' && run.status.toLowerCase() === 'running'
+    );
+    if (runningRun) {
+      void this.resumeRun({
+        runId: (runningRun as any).run_id,
+        sessionId,
+      }).catch((err) => {
+        Logger.warn('[AgnoClient] Auto-resume failed:', err);
       });
     }
 
@@ -1739,6 +1791,157 @@ export class AgnoClient extends EventEmitter {
         this.emit('state:change', this.getState());
 
         // Trigger refresh if run completed successfully
+        if (this.runCompletedSuccessfully) {
+          this.runCompletedSuccessfully = false;
+          await this.refreshSessionMessages();
+        }
+      },
+    });
+  }
+
+  /**
+   * Resume a backgrounded run by replaying buffered events from the server.
+   *
+   * Used automatically by `loadSession` when a run has `status === "RUNNING"`.
+   * Can also be called manually if you have a runId and want to pick up the
+   * stream (e.g., to recover from a transient failure).
+   *
+   * @param options.runId - The run ID to resume.
+   * @param options.sessionId - Defaults to current session.
+   * @param options.lastEventIndex - Omit for full replay (recommended). If
+   *   provided, the server only sends events after this index.
+   * @throws if no entity is configured, no sessionId is available, or another
+   *   run is currently streaming.
+   */
+  async resumeRun(options: {
+    runId: string;
+    sessionId?: string;
+    lastEventIndex?: number;
+    headers?: Record<string, string>;
+    params?: Record<string, string>;
+  }): Promise<void> {
+    const { runId, lastEventIndex } = options;
+
+    // Guard: double-resume of the same run is a no-op.
+    if (this.state.isStreaming) {
+      if (this.state.currentRunId === runId) return;
+      throw new Error('Already streaming a different run');
+    }
+
+    const sessionId = options.sessionId ?? this.configManager.getSessionId();
+    if (!sessionId) {
+      throw new Error('resumeRun requires a sessionId (none provided and no active session)');
+    }
+
+    const resumeUrl = this.configManager.getResumeUrl(runId);
+    if (!resumeUrl) {
+      throw new Error('No agent or team selected');
+    }
+
+    // Ensure an agent placeholder exists for this run, and that it's empty.
+    // Auto-resume invocations hit the "reuse" branch (loadSession added a
+    // placeholder from history) — clear its content/tool_calls to avoid
+    // duplication if the row had partial content. Manual invocations may
+    // hit the "append" branch.
+    const messages = this.messageStore.getMessages();
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.role === 'agent' && lastMessage.run_id === runId) {
+      const lastIndex = messages.length - 1;
+      this.messageStore.updateMessage(lastIndex, (m) => ({
+        ...m,
+        content: '',
+        tool_calls: [],
+      }));
+    } else {
+      this.messageStore.addMessage({
+        role: 'agent',
+        content: '',
+        tool_calls: [],
+        streamingError: false,
+        run_id: runId,
+        created_at: Math.floor(Date.now() / 1000),
+      });
+    }
+
+    // Reset eventProcessor — full replay restarts delta-vs-cumulative tracking.
+    this.eventProcessor.reset();
+    this.runCompletedSuccessfully = false;
+
+    this.abortController = new AbortController();
+    this.currentRunId = runId;
+    this.state.isStreaming = true;
+    this.state.currentRunId = runId;
+    this.state.errorMessage = undefined;
+
+    this.emit('stream:start');
+    this.emit('run:resume:start', { runId, sessionId });
+    this.emit('state:change', this.getState());
+    this.emit('message:update', this.messageStore.getMessages());
+
+    const formData = new FormData();
+    // Omit last_event_index when undefined so the server defaults to None (full replay).
+    // Sending empty string risks FastAPI `int('')` validation errors depending on the endpoint signature.
+    if (lastEventIndex !== undefined) {
+      formData.append('last_event_index', String(lastEventIndex));
+    }
+    formData.append('session_id', sessionId);
+
+    const userId = this.configManager.getUserId();
+    if (userId) {
+      formData.append('user_id', userId);
+    }
+
+    await this.executeStream({
+      apiUrl: resumeUrl,
+      requestBody: formData,
+      signal: this.abortController.signal,
+      perRequestHeaders: options.headers,
+      perRequestParams: options.params,
+      streamingFn: streamResponseSSE,
+      onChunk: (chunk: RunResponse) => {
+        const ev = (chunk as any).event as string;
+
+        // Meta events from /resume — intercept before the normal pipeline.
+        if (ev === 'catch_up' || ev === 'replay' || ev === 'subscribed') {
+          this.emit('run:resume:meta', { type: ev, runId });
+          return;
+        }
+
+        if (ev === 'error') {
+          const message =
+            (chunk as any).message ||
+            (chunk as any).detail ||
+            (chunk.content as string) ||
+            'Resume failed';
+          this.emit('run:resume:error', { runId, message });
+          return;
+        }
+
+        // Real run events flow through the standard handler.
+        this.handleChunk(chunk, sessionId, '');
+      },
+      onError: (error) => {
+        // Soft-fail: emit a dedicated event and clean up state. Do NOT call
+        // handleError — that strips the agent placeholder and sets a generic
+        // errorMessage, both of which contradict the spec's "silent default" UX.
+        this.emit('run:resume:error', { runId, message: error.message });
+        this.state.isStreaming = false;
+        this.currentRunId = undefined;
+        this.state.currentRunId = undefined;
+        this.abortController = undefined;
+        this.emit('stream:end');
+        this.emit('state:change', this.getState());
+      },
+      onComplete: async () => {
+        this.state.isStreaming = false;
+        this.currentRunId = undefined;
+        this.state.currentRunId = undefined;
+        this.abortController = undefined;
+        this.emit('stream:end');
+        this.emit('run:resume:end', { runId });
+        this.emit('message:complete', this.messageStore.getMessages());
+        this.emit('state:change', this.getState());
+
         if (this.runCompletedSuccessfully) {
           this.runCompletedSuccessfully = false;
           await this.refreshSessionMessages();

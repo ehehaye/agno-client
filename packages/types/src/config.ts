@@ -126,6 +126,15 @@ export interface AgnoClientConfig {
    * Default: true
    */
   refreshTeamSessionStateOnStreamEnd?: boolean;
+
+  /**
+   * If true, `sendMessage` defaults to background mode (server-side detached run
+   * that survives client disconnect). Can be overridden per-call via
+   * `sendMessage(msg, { background: false })`. Default: false.
+   *
+   * See docs/background-execution.md.
+   */
+  background?: boolean;
 }
 
 /**

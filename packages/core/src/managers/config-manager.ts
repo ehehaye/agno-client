@@ -217,6 +217,20 @@ export class ConfigManager {
   }
 
   /**
+   * Get whether sendMessage defaults to background mode.
+   */
+  getBackground(): boolean {
+    return this.config.background ?? false;
+  }
+
+  /**
+   * Set whether sendMessage defaults to background mode.
+   */
+  setBackground(background: boolean): void {
+    this.updateField('background', background);
+  }
+
+  /**
    * Get current entity ID (agent or team based on mode)
    */
   getCurrentEntityId(): string | undefined {
@@ -266,6 +280,31 @@ export class ConfigManager {
       return `${endpoint}/teams/${encodedEntityId}/runs/${encodedRunId}/cancel`;
     } else {
       return `${endpoint}/agents/${encodedEntityId}/runs/${encodedRunId}/cancel`;
+    }
+  }
+
+  /**
+   * Construct the resume URL for a specific run.
+   * POST /agents/{agent_id}/runs/{run_id}/resume
+   * POST /teams/{team_id}/runs/{run_id}/resume
+   *
+   * @param runId - The run ID to resume
+   * @returns The resume URL or null if entity ID is not configured
+   */
+  getResumeUrl(runId: string): string | null {
+    const mode = this.getMode();
+    const endpoint = this.getEndpoint();
+    const entityId = this.getCurrentEntityId();
+
+    if (!entityId || !runId) return null;
+
+    const encodedEntityId = encodeURIComponent(entityId);
+    const encodedRunId = encodeURIComponent(runId);
+
+    if (mode === 'team') {
+      return `${endpoint}/teams/${encodedEntityId}/runs/${encodedRunId}/resume`;
+    } else {
+      return `${endpoint}/agents/${encodedEntityId}/runs/${encodedRunId}/resume`;
     }
   }
 

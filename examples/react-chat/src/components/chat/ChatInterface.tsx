@@ -30,7 +30,11 @@ function ScrollOnNewUserMessage({ messageCount }: { messageCount: number }) {
   return null
 }
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  backgroundMode?: boolean
+}
+
+export function ChatInterface({ backgroundMode = false }: ChatInterfaceProps) {
   const { messages, sendMessage, isStreaming, cancelRun, error } = useAgnoChat()
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -66,7 +70,7 @@ export function ChatInterface() {
 
   const handleSend = async (message: string | FormData) => {
     try {
-      await sendMessage(message)
+      await sendMessage(message, { background: backgroundMode })
     } catch (err) {
       toast.error(`Failed to send message: ${error || err}`)
     }

@@ -7,6 +7,8 @@ import type { ToolCall } from '@rodrigocoliveira/agno-types'
 import { SessionSidebar } from '@/components/sessions/SessionSidebar'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { PanelLeftClose, PanelLeftOpen, Zap, Brain, Code2, Sparkles, Rocket, Cat, Copy, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -23,6 +25,7 @@ const SUGGESTED_PROMPTS = [
 
 export function ChatComponentsPage() {
   const [showSessionSidebar, setShowSessionSidebar] = useState(true)
+  const [backgroundMode, setBackgroundMode] = useState<boolean>(false)
 
   // ask_user_question HITL state
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null)
@@ -153,6 +156,18 @@ export function ChatComponentsPage() {
           <span className="text-xs text-muted-foreground ml-2">
             {showSessionSidebar ? 'Sessions' : 'Show sessions sidebar'}
           </span>
+
+          {/* Background mode toggle */}
+          <div className="flex items-center gap-2 ml-auto pr-1">
+            <Switch
+              id="background-mode"
+              checked={backgroundMode}
+              onCheckedChange={setBackgroundMode}
+            />
+            <Label htmlFor="background-mode" className="text-xs text-muted-foreground cursor-pointer select-none">
+              Background mode
+            </Label>
+          </div>
         </div>
 
         {/* Chat Interface — compound component pattern */}
@@ -160,6 +175,7 @@ export function ChatComponentsPage() {
           <AgnoChat
             skipToolsOnSessionLoad={['ask_user_question']}
             debug={false}
+            background={backgroundMode}
             toolHandlers={toolHandlers}
             renderTool={renderTool}
           >
@@ -179,7 +195,7 @@ export function ChatComponentsPage() {
               showReasoning={true}
               messageClassNames={{ assistant: { container: 'pl-3' } }}
               actions={{
-                visibility: 'hover-last-visible',
+                visibility: 'hover',
                 assistant: (message) => (
                   <>
                     <button
