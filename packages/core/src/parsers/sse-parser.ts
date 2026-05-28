@@ -22,7 +22,9 @@ export function parseSSEBuffer(
   buffer: string,
   onChunk: (chunk: RunResponseContent) => void
 ): string {
-  let remainder = buffer;
+  // Normalise CRLF and bare CR to LF so the rest of the function only deals with \n.
+  // Covers all three W3C-spec frame delimiters: \n\n, \r\n\r\n, and \r\r.
+  let remainder = buffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
   while (true) {
     const frameEnd = remainder.indexOf('\n\n');
