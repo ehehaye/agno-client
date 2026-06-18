@@ -156,6 +156,60 @@ describe('AgnoClient session_state wiring', () => {
     expect(client.getSessionState()).toEqual({ counter: 7 });
   });
 
+  test('mergeSessionState deep-merges nested partials and persists (issue #40)', async () => {
+    const client = makeClient({ sessionId: 's1' });
+
+    // Stub the network persist so we exercise merge + cache, not HTTP.
+    let persisted: Record<string, unknown> | undefined;
+    (client as unknown as {
+      updateSession: (id: string, body: { session_state: Record<string, unknown> }) => Promise<void>;
+    }).updateSession = async (_id, body) => {
+      persisted = body.session_state;
+    };
+
+    // Seed current state via a stream chunk.
+    const handle = (client as unknown as {
+      handleChunk: (chunk: unknown, sid: string | undefined, msg: string) => void;
+    }).handleChunk.bind(client);
+    handle({ event: 'RunStarted', session_id: 's1', created_at: 0, content_type: 'str' } as any, undefined, 'x');
+    handle(
+      {
+        event: 'CustomEvent',
+        session_id: 's1',
+        created_at: 1,
+        content_type: 'str',
+        session_state: { rfq: { headers: { project_id: null }, items: ['a', 'b', 'c'], status: 'draft' } },
+      } as any,
+      's1',
+      'x'
+    );
+
+    const events: Array<Record<string, unknown> | null> = [];
+    client.on('session-state:change', (state) => events.push(state));
+
+    await client.mergeSessionState({ rfq: { headers: { project_id: 42 } } });
+
+    const expected = {
+      rfq: { headers: { project_id: 42 }, items: ['a', 'b', 'c'], status: 'draft' },
+    };
+    expect(client.getSessionState()).toEqual(expected);
+    expect(persisted).toEqual(expected);
+    expect(events[events.length - 1]).toEqual(expected);
+  });
+
+  test('mergeSessionState on empty state behaves like a plain set', async () => {
+    const client = makeClient({ sessionId: 's1' });
+    (client as unknown as { updateSession: () => Promise<void> }).updateSession = async () => {};
+
+    await client.mergeSessionState({ counter: 1 });
+    expect(client.getSessionState()).toEqual({ counter: 1 });
+  });
+
+  test('mergeSessionState rejects without an active session', async () => {
+    const client = makeClient(); // no sessionId
+    await expect(client.mergeSessionState({ a: 1 })).rejects.toThrow();
+  });
+
   test('clearMessages clears session_state and emits', () => {
     const client = makeClient();
     const handle = (client as unknown as {

@@ -10,6 +10,11 @@ import { useAgnoClient } from '../context/AgnoContext';
  * - On any CustomEvent with a `session_state` field (opt-out via config)
  * - On team runs, via a post-stream REST refresh (workaround through Agno 2.6.0)
  *
+ * `mergeSessionState` deep-merges its partial into the current state (plain
+ * objects merge recursively at any depth; arrays and primitives replace). Use
+ * `setSessionState` to replace a whole branch or drop keys. Rule of thumb:
+ * **merge patches, set replaces.**
+ *
  * @example
  * ```tsx
  * type MyState = { counter: number; lastAction?: string };
@@ -72,11 +77,8 @@ export function useAgnoSessionState<
   );
 
   const mergeSessionState = useCallback(
-    async (partial: Partial<T>): Promise<void> => {
-      const current = (client.getSessionState<T>() ?? ({} as T)) as T;
-      const merged = { ...current, ...partial } as T;
-      await client.setSessionState(merged);
-    },
+    (partial: Partial<T>): Promise<void> =>
+      client.mergeSessionState(partial as Record<string, unknown>),
     [client]
   );
 

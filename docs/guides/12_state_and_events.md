@@ -101,12 +101,37 @@ function Panel() {
 // Read
 client.getSessionState<MyState>(); // MyState | null
 
-// Write (PATCH /sessions/{id} + update cache)
+// Write — replace (PATCH /sessions/{id} + update cache)
 await client.setSessionState({ counter: 42 });
+
+// Write — deep-merge a partial, then persist
+await client.mergeSessionState({ rfq: { headers: { project_id: 42 } } });
 
 // Manual refetch from GET /sessions/{id}
 await client.refreshSessionState();
 ```
+
+#### `merge` vs `set`
+
+`mergeSessionState` **deep-merges**: plain objects merge recursively at any
+depth, while arrays and primitives replace. Sibling keys are always preserved.
+
+```typescript
+// current: { rfq: { headers: { project_id: null }, items: ['a','b'], status: 'draft' } }
+await client.mergeSessionState({ rfq: { headers: { project_id: 42 } } });
+// result:  { rfq: { headers: { project_id: 42 },  items: ['a','b'], status: 'draft' } }
+//            └ only project_id changed; items & status survive
+```
+
+To **replace** a whole branch (dropping its old keys) or delete keys, use
+`setSessionState` — in React, the functional updater gives you full control:
+
+```tsx
+// drop project_id, set headers to a fresh object
+setSessionState(prev => ({ ...prev, rfq: { ...prev.rfq, headers: { region: 'BR' } } }));
+```
+
+Rule of thumb: **`merge` patches, `set` replaces.**
 
 ### Scope
 

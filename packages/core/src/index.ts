@@ -9,6 +9,7 @@ export { AgnoClient } from './client';
 // Utilities
 export { Logger } from './utils/logger';
 export { parseToolArg, parseToolArgs } from './utils/parse-tool-arg';
+export { deepMerge, isPlainObject } from './utils/deep-merge';
 
 // Traces manager types
 export type {

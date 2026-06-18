@@ -89,6 +89,7 @@ import { streamResponse } from './parsers/stream-parser';
 import { streamResponseSSE } from './parsers/sse-parser';
 import { Logger } from './utils/logger';
 import { parseToolArgs } from './utils/parse-tool-arg';
+import { deepMerge } from './utils/deep-merge';
 
 /**
  * Safely converts a Unix timestamp to ISO string with validation
@@ -242,6 +243,23 @@ export class AgnoClient extends EventEmitter {
     }
     await this.updateSession(sessionId, { session_state: state }, options);
     this.applySessionState(state, { source: 'manual-set' });
+  }
+
+  /**
+   * Deep-merge a partial into the current session_state and persist via
+   * PATCH /sessions/{id}. Plain objects merge recursively at any depth; arrays
+   * and primitives replace. Use `setSessionState` to replace a whole branch or
+   * drop keys.
+   *
+   * Requires an active session (the underlying `setSessionState` throws if none).
+   */
+  async mergeSessionState(
+    partial: Record<string, unknown>,
+    options?: { params?: Record<string, string> }
+  ): Promise<void> {
+    const current = this.getSessionState() ?? {};
+    const merged = deepMerge(current, partial);
+    await this.setSessionState(merged, options);
   }
 
   /**
