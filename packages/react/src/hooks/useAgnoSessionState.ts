@@ -15,6 +15,12 @@ import { useAgnoClient } from '../context/AgnoContext';
  * `setSessionState` to replace a whole branch or drop keys. Rule of thumb:
  * **merge patches, set replaces.**
  *
+ * `mergeSessionState` is a read-modify-write (read cache → deepMerge → PATCH),
+ * so always `await` calls sequentially — firing several un-awaited merges makes
+ * them read the same stale base and the later one clobbers the earlier (lost
+ * update). Each call is one PATCH; batch fields into a single object when you
+ * can, and avoid writing while a run is streaming.
+ *
  * @example
  * ```tsx
  * type MyState = { counter: number; lastAction?: string };

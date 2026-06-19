@@ -252,6 +252,26 @@ export class AgnoClient extends EventEmitter {
    * drop keys.
    *
    * Requires an active session (the underlying `setSessionState` throws if none).
+   *
+   * IMPORTANT — this is a read-modify-write: it reads the local cache, runs
+   * `deepMerge`, then PATCHes. The cache only updates AFTER the PATCH resolves,
+   * so concurrent (un-awaited) calls read the same stale base and the later one
+   * overwrites the earlier — a classic lost update. Always `await` sequentially:
+   *
+   * ```ts
+   * // ✅ safe — cache updates between calls
+   * await client.mergeSessionState({ a: 1 });
+   * await client.mergeSessionState({ b: 2 }); // reads { a: 1 } → { a: 1, b: 2 }
+   *
+   * // ❌ lost update — both read {}; if they touch the same branch, one wins
+   * client.mergeSessionState({ rfq: { x: 1 } });
+   * client.mergeSessionState({ rfq: { y: 2 } }); // may end up { rfq: { y: 2 } }
+   * ```
+   *
+   * Each call is one PATCH (no batching) — merge a single object to change
+   * several fields in one round-trip. Avoid writing while a run is streaming:
+   * `RunCompleted` overwrites the cache with the agent's state (last-writer-wins,
+   * no cross-merge), so a mid-run write can be silently lost.
    */
   async mergeSessionState(
     partial: Record<string, unknown>,
