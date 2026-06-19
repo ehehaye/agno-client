@@ -133,6 +133,28 @@ setSessionState(prev => ({ ...prev, rfq: { ...prev.rfq, headers: { region: 'BR' 
 
 Rule of thumb: **`merge` patches, `set` replaces.**
 
+#### Don't write session_state while a run is streaming
+
+`setSessionState` / `mergeSessionState` are direct `PATCH /sessions/{id}` calls,
+and the client applies **last-writer-wins with no cross-merge**. While an agent
+run is in flight, the backend owns `session_state`: the `RunCompleted` chunk
+overwrites the local cache with the agent's version (team runs additionally
+re-fetch on stream end). So a manual write made mid-run can be silently lost —
+and, depending on timing, the agent's own end-of-run persist can overwrite your
+`PATCH` on the backend too.
+
+This is intentional: the agent may have deleted or restructured the exact branch
+the user is editing, so re-applying a stale manual edit on top would produce
+incoherent state. **Gate edits on the streaming flag** instead of racing:
+
+```tsx
+const { isStreaming } = useAgnoChat();
+// disable the editor / save button while the agent runs
+<button disabled={isStreaming} onClick={() => mergeSessionState({ /* ... */ })}>
+  Save
+</button>
+```
+
 ### Scope
 
 Session state works identically for **agents** and **teams**. **Workflows are not supported** — the Agno workflow completion event does not carry `session_state`, and this client does not currently expose a `mode: 'workflow'`.
