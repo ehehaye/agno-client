@@ -28,19 +28,6 @@ describe('SessionStateManager', () => {
     expect(mgr.get()).toBeNull();
   });
 
-  test('merge() shallow-merges into the current state', () => {
-    const mgr = new SessionStateManager();
-    mgr.set({ counter: 1, marker: 'a' });
-    mgr.merge({ counter: 2 });
-    expect(mgr.get()).toEqual({ counter: 2, marker: 'a' });
-  });
-
-  test('merge() on empty initializes', () => {
-    const mgr = new SessionStateManager();
-    mgr.merge({ counter: 1 });
-    expect(mgr.get()).toEqual({ counter: 1 });
-  });
-
   test('clear() returns true only when state existed', () => {
     const mgr = new SessionStateManager();
     expect(mgr.clear()).toBe(false);

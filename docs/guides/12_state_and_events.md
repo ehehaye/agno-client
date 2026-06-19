@@ -101,11 +101,58 @@ function Panel() {
 // Read
 client.getSessionState<MyState>(); // MyState | null
 
-// Write (PATCH /sessions/{id} + update cache)
+// Write — replace (PATCH /sessions/{id} + update cache)
 await client.setSessionState({ counter: 42 });
+
+// Write — deep-merge a partial, then persist
+await client.mergeSessionState({ rfq: { headers: { project_id: 42 } } });
 
 // Manual refetch from GET /sessions/{id}
 await client.refreshSessionState();
+```
+
+#### `merge` vs `set`
+
+`mergeSessionState` **deep-merges**: plain objects merge recursively at any
+depth, while arrays and primitives replace. Sibling keys are always preserved.
+
+```typescript
+// current: { rfq: { headers: { project_id: null }, items: ['a','b'], status: 'draft' } }
+await client.mergeSessionState({ rfq: { headers: { project_id: 42 } } });
+// result:  { rfq: { headers: { project_id: 42 },  items: ['a','b'], status: 'draft' } }
+//            └ only project_id changed; items & status survive
+```
+
+To **replace** a whole branch (dropping its old keys) or delete keys, use
+`setSessionState` — in React, the functional updater gives you full control:
+
+```tsx
+// drop project_id, set headers to a fresh object
+setSessionState(prev => ({ ...prev, rfq: { ...prev.rfq, headers: { region: 'BR' } } }));
+```
+
+Rule of thumb: **`merge` patches, `set` replaces.**
+
+#### Don't write session_state while a run is streaming
+
+`setSessionState` / `mergeSessionState` are direct `PATCH /sessions/{id}` calls,
+and the client applies **last-writer-wins with no cross-merge**. While an agent
+run is in flight, the backend owns `session_state`: the `RunCompleted` chunk
+overwrites the local cache with the agent's version (team runs additionally
+re-fetch on stream end). So a manual write made mid-run can be silently lost —
+and, depending on timing, the agent's own end-of-run persist can overwrite your
+`PATCH` on the backend too.
+
+This is intentional: the agent may have deleted or restructured the exact branch
+the user is editing, so re-applying a stale manual edit on top would produce
+incoherent state. **Gate edits on the streaming flag** instead of racing:
+
+```tsx
+const { isStreaming } = useAgnoChat();
+// disable the editor / save button while the agent runs
+<button disabled={isStreaming} onClick={() => mergeSessionState({ /* ... */ })}>
+  Save
+</button>
 ```
 
 ### Scope

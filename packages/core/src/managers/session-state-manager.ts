@@ -30,14 +30,6 @@ export class SessionStateManager {
     return true;
   }
 
-  /** Shallow-merge a partial into the cached state. */
-  merge(partial: Record<string, unknown>): boolean {
-    const base = this.state ?? {};
-    const next = { ...base, ...partial };
-    this.state = next;
-    return true;
-  }
-
   /** Clear the cache. Used on session switch or clearMessages(). */
   clear(): boolean {
     if (this.state === null) return false;
