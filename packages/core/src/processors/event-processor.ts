@@ -85,8 +85,18 @@ export class EventProcessor {
     if (!lastMessage || lastMessage.role !== 'agent') {
       return lastMessage;
     }
+    
+    let event = chunk.event as RunEvent;
+    let content = chunk.content;
 
-    const event = chunk.event as RunEvent;
+    // Hack for non-standard backend events (such as models using DeepSeek) that emit reasoning steps in `RunContent` instead of `ReasoningStep`
+    if (!Object.hasOwnProperty.call(chunk, 'content') && Object.hasOwnProperty.call(chunk, 'reasoning_content')) {
+      event = RunEventEnum.ReasoningStep;
+      content = {
+        reasoning: chunk.reasoning_content
+      } as ReasoningSteps
+    }
+
     const updatedMessage = { ...lastMessage };
 
     switch (event) {
@@ -109,16 +119,16 @@ export class EventProcessor {
 
       case RunEventEnum.RunContent:
       case RunEventEnum.TeamRunContent:
-        if (typeof chunk.content === 'string') {
-          const uniqueContent = chunk.content.replace(this.lastContent, '');
+        if (typeof content === 'string') {
+          const uniqueContent = content.replace(this.lastContent, '');
           updatedMessage.content =
             (updatedMessage.content as string) + uniqueContent;
-          this.lastContent = chunk.content;
+          this.lastContent = content;
         } else if (
-          typeof chunk.content !== 'string' &&
-          chunk.content !== null
+          typeof content !== 'string' &&
+          content !== null
         ) {
-          const jsonBlock = getJsonMarkdown(chunk.content);
+          const jsonBlock = getJsonMarkdown(content);
           updatedMessage.content = (updatedMessage.content as string) + jsonBlock;
           this.lastContent = jsonBlock;
         }
@@ -182,8 +192,8 @@ export class EventProcessor {
         // backend variants that surface an accumulated list there.
         const incomingSteps =
           chunk.extra_data?.reasoning_steps ??
-          (chunk.content && typeof chunk.content === 'object'
-            ? [chunk.content as ReasoningSteps]
+          (content && typeof content === 'object'
+            ? [content as ReasoningSteps]
             : []);
 
         updatedMessage.extra_data = {
@@ -206,11 +216,11 @@ export class EventProcessor {
       case RunEventEnum.RunCompleted:
       case RunEventEnum.TeamRunCompleted:
         let updatedContent: string;
-        if (typeof chunk.content === 'string') {
-          updatedContent = chunk.content;
+        if (typeof content === 'string') {
+          updatedContent = content;
         } else {
           try {
-            updatedContent = JSON.stringify(chunk.content);
+            updatedContent = JSON.stringify(content);
           } catch {
             updatedContent = 'Error parsing response';
           }
