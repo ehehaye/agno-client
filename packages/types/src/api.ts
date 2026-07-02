@@ -219,6 +219,7 @@ export interface TeamSessionDetailSchema {
  */
 export interface RunResponse {
   content?: string | object;
+  reasoning_content?: string;
   content_type: string;
   context?: MessageContext[];
   event: RunEvent;
